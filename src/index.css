@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@400;500;600&family=Roboto+Mono:wght@400&display=swap');
+
+/* Custom font faces for fonts not available on Google Fonts */
+@font-face {
+  font-family: 'BIZ UDPMincho';
+  font-style: normal;
+  font-weight: 400;
+  src: local('BIZ UDPMincho');
+}
+
+@font-face {
+  font-family: 'Abyssinica SIL';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Abyssinica SIL');
+}
