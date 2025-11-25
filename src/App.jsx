@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchContacts, createContact, updateContact, deleteContact, toggleContactStatus, subscribeToContacts } from './lib/contacts';
+import { fetchOrganizations, createOrganization, updateOrganization, deleteOrganization, subscribeToOrganizations, ORGANIZATION_TYPES, ORGANIZATION_STATUSES } from './lib/organizations';
+import { fetchPrograms, createProgram, updateProgram, deleteProgram, subscribeToPrograms, PROGRAM_TYPES, PROGRAM_STATUSES } from './lib/programs';
+import { fetchInteractions, createInteraction, updateInteraction, deleteInteraction, completeFollowup, subscribeToInteractions, INTERACTION_TYPES, INTERACTION_DIRECTIONS } from './lib/interactions';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider, useToast } from './components/Toast/Toast';
 import LoginPage from './components/Auth/LoginPage';
@@ -528,8 +531,8 @@ const Sidebar = () => {
 
   const mainMenuItems = [
     { name: 'Dashboard', icon: IconDashboard, path: '/' },
+    { name: 'Activity Log', icon: IconNote, path: '/activity' },
     { name: 'Notifications', icon: IconBell, path: '/notifications' },
-    { name: 'Notes', icon: IconNote, path: '/notes' },
     { name: 'Tasks', icon: IconTasks, path: '/tasks' },
     { name: 'Emails', icon: IconEmail, hasDropdown: true, path: '/emails' },
     { name: 'Calendars', icon: IconCalendar, path: '/calendars' }
@@ -538,7 +541,8 @@ const Sidebar = () => {
   const databaseMenuItems = [
     { name: 'Analytics', icon: IconChartLine, path: '/analytics' },
     { name: 'Contacts', icon: IconUsers, path: '/contacts' },
-    { name: 'Companies', icon: IconBuilding, path: '/companies' }
+    { name: 'Organizations', icon: IconBuilding, path: '/organizations' },
+    { name: 'Programs', icon: IconProgram, path: '/programs' }
   ];
 
   const handleNavClick = (path) => {
@@ -998,6 +1002,2231 @@ const NotesPage = () => {
   );
 };
 
+
+// Organization type badge styling
+const getOrgTypeBadge = (type) => {
+  const styles = {
+    LSO: 'bg-purple-50 text-purple-600',
+    Partner: 'bg-blue-50 text-blue-600',
+    School: 'bg-green-50 text-green-600',
+    Government: 'bg-yellow-50 text-yellow-700',
+    Community: 'bg-orange-50 text-orange-600',
+    Funder: 'bg-pink-50 text-pink-600',
+    Other: 'bg-gray-50 text-gray-600'
+  };
+  return styles[type] || styles.Other;
+};
+
+// Organization status badge styling
+const getOrgStatusBadge = (status) => {
+  const styles = {
+    active: 'bg-green-50 text-green-600',
+    inactive: 'bg-gray-50 text-gray-600',
+    prospect: 'bg-blue-50 text-blue-600'
+  };
+  return styles[status] || styles.inactive;
+};
+
+// Add Organization Modal Component
+const AddOrganizationModal = ({ isOpen, onClose, onAdd, editOrganization }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'LSO',
+    status: 'active',
+    email: '',
+    phone: '',
+    website: '',
+    address_street: '',
+    address_city: '',
+    address_province: '',
+    address_postal_code: '',
+    description: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    if (editOrganization) {
+      setFormData({
+        name: editOrganization.name || '',
+        type: editOrganization.type || 'LSO',
+        status: editOrganization.status || 'active',
+        email: editOrganization.email || '',
+        phone: editOrganization.phone || '',
+        website: editOrganization.website || '',
+        address_street: editOrganization.address_street || '',
+        address_city: editOrganization.address_city || '',
+        address_province: editOrganization.address_province || '',
+        address_postal_code: editOrganization.address_postal_code || '',
+        description: editOrganization.description || '',
+        notes: editOrganization.notes || ''
+      });
+    } else {
+      setFormData({
+        name: '',
+        type: 'LSO',
+        status: 'active',
+        email: '',
+        phone: '',
+        website: '',
+        address_street: '',
+        address_city: '',
+        address_province: '',
+        address_postal_code: '',
+        description: '',
+        notes: ''
+      });
+    }
+  }, [editOrganization, isOpen]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onAdd(formData);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[600px] max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h3 className="text-gray-900 text-lg font-medium">
+            {editOrganization ? 'Edit Organization' : 'Add New Organization'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Organization Name *</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              placeholder="Enter organization name"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Type *</label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                {ORGANIZATION_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                {ORGANIZATION_STATUSES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Email</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="contact@organization.com"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Phone</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Website</label>
+            <input
+              type="url"
+              value={formData.website}
+              onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              placeholder="https://www.example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Street Address</label>
+            <input
+              type="text"
+              value={formData.address_street}
+              onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              placeholder="123 Main Street"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">City</label>
+              <input
+                type="text"
+                value={formData.address_city}
+                onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="City"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Province</label>
+              <input
+                type="text"
+                value={formData.address_province}
+                onChange={(e) => setFormData({ ...formData, address_province: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="ON"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Postal Code</label>
+              <input
+                type="text"
+                value={formData.address_postal_code}
+                onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="A1B 2C3"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={2}
+              placeholder="Brief description of the organization"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={2}
+              placeholder="Internal notes about this organization"
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-black text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-gray-800 transition-colors"
+            >
+              {editOrganization ? 'Update Organization' : 'Add Organization'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Delete Organization Confirmation Modal
+const DeleteOrganizationModal = ({ isOpen, onClose, onConfirm, organizationName }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[400px] p-5 shadow-xl">
+        <h3 className="text-gray-900 text-lg font-medium mb-4">Delete Organization</h3>
+        <p className="text-gray-600 text-sm mb-6">
+          Are you sure you want to delete <span className="text-gray-900 font-medium">{organizationName}</span>? This will also remove all associated relationships. This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-500 text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-red-600 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Organizations Page
+const OrganizationsPage = () => {
+  const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editOrganization, setEditOrganization] = useState(null);
+  const [deleteOrganizationData, setDeleteOrganizationData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const itemsPerPage = 10;
+  const toast = useToast();
+
+  // Fetch organizations from Supabase
+  const loadOrganizations = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchOrganizations({
+        type: typeFilter,
+        status: statusFilter,
+        search: searchQuery,
+        sortBy: sortConfig.key,
+        sortDirection: sortConfig.direction
+      });
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error('Failed to load organizations:', error);
+      toast.error('Failed to load organizations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrganizations();
+
+    // Subscribe to realtime updates
+    const unsubscribe = subscribeToOrganizations(() => {
+      loadOrganizations();
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Filter organizations (client-side for immediate feedback)
+  const filteredOrganizations = organizations.filter(org => {
+    const matchesSearch =
+      org.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      org.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      org.address_city?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesType = typeFilter === 'all' || org.type === typeFilter;
+    const matchesStatus = statusFilter === 'all' || org.status === statusFilter;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Sort organizations
+  const sortedOrganizations = [...filteredOrganizations].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let aValue = a[sortConfig.key] || '';
+    let bValue = b[sortConfig.key] || '';
+
+    if (typeof aValue === 'string') {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginate organizations
+  const totalPages = Math.ceil(sortedOrganizations.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedOrganizations = sortedOrganizations.slice(startIndex, startIndex + itemsPerPage);
+
+  // Handle sort
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // Handle add organization
+  const handleAddOrganization = async (formData) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editOrganization) {
+        await updateOrganization(editOrganization.id, formData);
+        setEditOrganization(null);
+        toast.success('Organization updated successfully');
+      } else {
+        await createOrganization(formData);
+        toast.success('Organization created successfully');
+      }
+      await loadOrganizations();
+    } catch (error) {
+      console.error('Failed to save organization:', error);
+      toast.error('Failed to save organization. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle edit organization
+  const handleEditOrganization = (org) => {
+    setEditOrganization(org);
+    setIsModalOpen(true);
+  };
+
+  // Handle delete organization
+  const handleDeleteOrganization = async () => {
+    if (deleteOrganizationData) {
+      try {
+        await deleteOrganization(deleteOrganizationData.id);
+        setDeleteOrganizationData(null);
+        if (paginatedOrganizations.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
+        await loadOrganizations();
+        toast.success('Organization deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete organization:', error);
+        toast.error('Failed to delete organization. Please try again.');
+      }
+    }
+  };
+
+  // Export to CSV
+  const handleExport = () => {
+    const headers = ['Name', 'Type', 'Status', 'Email', 'Phone', 'City', 'Province'];
+    const csvData = sortedOrganizations.map(org =>
+      [org.name, org.type, org.status, org.email || '', org.phone || '', org.address_city || '', org.address_province || ''].join(',')
+    );
+    const csv = [headers.join(','), ...csvData].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'organizations.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Header />
+
+      <div className="bg-white border-b border-gray-200 px-8 py-0 h-[69px] flex items-center justify-between">
+        <h1 className="text-2xl font-medium">Organizations</h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+          >
+            <IconExport />
+            Export
+          </button>
+          <button
+            onClick={() => { setEditOrganization(null); setIsModalOpen(true); }}
+            className="bg-black text-white text-sm font-medium px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+          >
+            + Add Organization
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-white p-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-medium">All Organizations</h2>
+            <div className="flex items-center gap-4">
+              {/* Search */}
+              <div className="flex items-center gap-3 border border-gray-300 rounded px-3 py-2.5 w-[300px]">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search organizations..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="flex-1 outline-none text-sm"
+                />
+              </div>
+              {/* Type Filter */}
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All Types</option>
+                {ORGANIZATION_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All Status</option>
+                {ORGANIZATION_STATUSES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              {(searchQuery || typeFilter !== 'all' || statusFilter !== 'all') && (
+                <button
+                  onClick={resetFilters}
+                  className="text-sm font-medium text-gray-600 hover:text-black"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="space-y-3">
+            {/* Header Row */}
+            <div className="bg-gray-50 border border-gray-200 rounded flex items-center">
+              <div className="w-[250px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
+                <span className="text-sm text-gray-400 uppercase">Name</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[120px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('type')}>
+                <span className="text-sm text-gray-400 uppercase">Type</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[200px] px-3 py-3 flex items-center gap-2">
+                <span className="text-sm text-gray-400 uppercase">Contact</span>
+              </div>
+              <div className="w-[150px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('address_city')}>
+                <span className="text-sm text-gray-400 uppercase">Location</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[100px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
+                <span className="text-sm text-gray-400 uppercase">Status</span>
+                <IconSortUpDown />
+              </div>
+              <div className="flex-1 px-3 py-3">
+                <span className="text-sm text-gray-400 uppercase">Actions</span>
+              </div>
+            </div>
+
+            {/* Data Rows */}
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">Loading organizations...</div>
+            ) : paginatedOrganizations.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                {organizations.length === 0 ? (
+                  <div>
+                    <p className="mb-2">No organizations yet.</p>
+                    <button
+                      onClick={() => { setEditOrganization(null); setIsModalOpen(true); }}
+                      className="text-black underline hover:no-underline"
+                    >
+                      Add your first organization
+                    </button>
+                  </div>
+                ) : (
+                  'No organizations found matching your criteria.'
+                )}
+              </div>
+            ) : (
+              paginatedOrganizations.map((org) => (
+                <div key={org.id} className="bg-white border border-gray-200 rounded flex items-center hover:shadow-sm transition-shadow">
+                  {/* Name */}
+                  <div className="w-[250px] px-3 py-2.5 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center">
+                      <IconBuilding className="w-4 h-4 text-gray-600" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium truncate">{org.name}</span>
+                      {org.website && (
+                        <a href={org.website} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate">
+                          {org.website.replace(/^https?:\/\//, '')}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  {/* Type */}
+                  <div className="w-[120px] px-3 py-2.5">
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getOrgTypeBadge(org.type)}`}>
+                      {org.type}
+                    </span>
+                  </div>
+                  {/* Contact */}
+                  <div className="w-[200px] px-3 py-2.5">
+                    {org.email && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <IconEnvelope />
+                        <a href={`mailto:${org.email}`} className="text-xs text-gray-600 hover:underline truncate">{org.email}</a>
+                      </div>
+                    )}
+                    {org.phone && (
+                      <div className="flex items-center gap-2">
+                        <IconPhone2 />
+                        <span className="text-xs text-gray-600">{org.phone}</span>
+                      </div>
+                    )}
+                    {!org.email && !org.phone && (
+                      <span className="text-xs text-gray-400">No contact info</span>
+                    )}
+                  </div>
+                  {/* Location */}
+                  <div className="w-[150px] px-3 py-2.5">
+                    {org.address_city || org.address_province ? (
+                      <div className="flex items-center gap-2">
+                        <IconMapPin />
+                        <span className="text-sm text-gray-600 truncate">
+                          {[org.address_city, org.address_province].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No location</span>
+                    )}
+                  </div>
+                  {/* Status */}
+                  <div className="w-[100px] px-3 py-2.5">
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium capitalize ${getOrgStatusBadge(org.status)}`}>
+                      {org.status}
+                    </span>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex-1 px-3 py-2.5 flex items-center gap-2">
+                    {org.email && (
+                      <button
+                        onClick={() => window.location.href = `mailto:${org.email}`}
+                        className="flex items-center gap-1 px-3 py-1.5 border border-black rounded text-xs font-medium hover:bg-gray-50"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Email
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleEditOrganization(org)}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-600"
+                      title="Edit"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setDeleteOrganizationData(org)}
+                      className="p-1.5 hover:bg-red-50 rounded text-red-500"
+                      title="Delete"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Table Footer */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+            <span className="text-gray-500 text-sm">
+              Showing {sortedOrganizations.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedOrganizations.length)} of {sortedOrganizations.length} entries
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronLeft />
+                </button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`text-sm font-medium w-7 h-7 rounded flex items-center justify-center transition-colors ${
+                        currentPage === page
+                          ? 'bg-black text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <AddOrganizationModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditOrganization(null); }}
+        onAdd={handleAddOrganization}
+        editOrganization={editOrganization}
+      />
+      <DeleteOrganizationModal
+        isOpen={!!deleteOrganizationData}
+        onClose={() => setDeleteOrganizationData(null)}
+        onConfirm={handleDeleteOrganization}
+        organizationName={deleteOrganizationData?.name}
+      />
+    </div>
+  );
+};
+
+// Program status badge styling
+const getProgramStatusBadge = (status) => {
+  const styles = {
+    planning: 'bg-yellow-50 text-yellow-700',
+    active: 'bg-green-50 text-green-600',
+    completed: 'bg-gray-50 text-gray-600',
+    cancelled: 'bg-red-50 text-red-600',
+    on_hold: 'bg-orange-50 text-orange-600'
+  };
+  return styles[status] || styles.planning;
+};
+
+// Program type badge styling
+const getProgramTypeBadge = (type) => {
+  const styles = {
+    Training: 'bg-blue-50 text-blue-600',
+    Development: 'bg-purple-50 text-purple-600',
+    Community: 'bg-green-50 text-green-600',
+    Competition: 'bg-red-50 text-red-600',
+    Camp: 'bg-orange-50 text-orange-600',
+    Other: 'bg-gray-50 text-gray-600'
+  };
+  return styles[type] || styles.Other;
+};
+
+// Add Program Modal Component
+const AddProgramModal = ({ isOpen, onClose, onAdd, editProgram, organizations }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'Training',
+    status: 'planning',
+    description: '',
+    sport: '',
+    start_date: '',
+    end_date: '',
+    schedule_notes: '',
+    location: '',
+    address: '',
+    capacity: '',
+    target_age_min: '',
+    target_age_max: '',
+    target_skill_level: '',
+    fee_amount: '',
+    fee_notes: '',
+    organization_id: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    if (editProgram) {
+      setFormData({
+        name: editProgram.name || '',
+        type: editProgram.type || 'Training',
+        status: editProgram.status || 'planning',
+        description: editProgram.description || '',
+        sport: editProgram.sport || '',
+        start_date: editProgram.start_date || '',
+        end_date: editProgram.end_date || '',
+        schedule_notes: editProgram.schedule_notes || '',
+        location: editProgram.location || '',
+        address: editProgram.address || '',
+        capacity: editProgram.capacity || '',
+        target_age_min: editProgram.target_age_min || '',
+        target_age_max: editProgram.target_age_max || '',
+        target_skill_level: editProgram.target_skill_level || '',
+        fee_amount: editProgram.fee_amount || '',
+        fee_notes: editProgram.fee_notes || '',
+        organization_id: editProgram.organization_id || '',
+        notes: editProgram.notes || ''
+      });
+    } else {
+      setFormData({
+        name: '',
+        type: 'Training',
+        status: 'planning',
+        description: '',
+        sport: '',
+        start_date: '',
+        end_date: '',
+        schedule_notes: '',
+        location: '',
+        address: '',
+        capacity: '',
+        target_age_min: '',
+        target_age_max: '',
+        target_skill_level: '',
+        fee_amount: '',
+        fee_notes: '',
+        organization_id: '',
+        notes: ''
+      });
+    }
+  }, [editProgram, isOpen]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Clean up the data before submitting
+    const cleanData = {
+      ...formData,
+      capacity: formData.capacity ? parseInt(formData.capacity) : null,
+      target_age_min: formData.target_age_min ? parseInt(formData.target_age_min) : null,
+      target_age_max: formData.target_age_max ? parseInt(formData.target_age_max) : null,
+      fee_amount: formData.fee_amount ? parseFloat(formData.fee_amount) : null,
+      organization_id: formData.organization_id || null,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null
+    };
+    onAdd(cleanData);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[700px] max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h3 className="text-gray-900 text-lg font-medium">
+            {editProgram ? 'Edit Program' : 'Add New Program'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-gray-700 text-sm font-medium mb-2">Program Name *</label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="Enter program name"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Type *</label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                {PROGRAM_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                {PROGRAM_STATUSES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Sport</label>
+              <input
+                type="text"
+                value={formData.sport}
+                onChange={(e) => setFormData({ ...formData, sport: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="e.g., Basketball, Soccer"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Partner Organization</label>
+              <select
+                value={formData.organization_id}
+                onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                <option value="">None</option>
+                {organizations.map(org => (
+                  <option key={org.id} value={org.id}>{org.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={2}
+              placeholder="Brief description of the program"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Start Date</label>
+              <input
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">End Date</label>
+              <input
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Schedule Notes</label>
+            <input
+              type="text"
+              value={formData.schedule_notes}
+              onChange={(e) => setFormData({ ...formData, schedule_notes: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              placeholder="e.g., Tuesdays and Thursdays, 4-6pm"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Location Name</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="e.g., Community Center"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Capacity</label>
+              <input
+                type="number"
+                value={formData.capacity}
+                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="Max participants"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Min Age</label>
+              <input
+                type="number"
+                value={formData.target_age_min}
+                onChange={(e) => setFormData({ ...formData, target_age_min: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Max Age</label>
+              <input
+                type="number"
+                value={formData.target_age_max}
+                onChange={(e) => setFormData({ ...formData, target_age_max: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Skill Level</label>
+              <select
+                value={formData.target_skill_level}
+                onChange={(e) => setFormData({ ...formData, target_skill_level: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                <option value="">Any</option>
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Fee Amount ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.fee_amount}
+                onChange={(e) => setFormData({ ...formData, fee_amount: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Fee Notes</label>
+              <input
+                type="text"
+                value={formData.fee_notes}
+                onChange={(e) => setFormData({ ...formData, fee_notes: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                placeholder="e.g., Subsidies available"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={2}
+              placeholder="Internal notes"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-black text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-gray-800 transition-colors"
+            >
+              {editProgram ? 'Update Program' : 'Add Program'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Delete Program Confirmation Modal
+const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[400px] p-5 shadow-xl">
+        <h3 className="text-gray-900 text-lg font-medium mb-4">Delete Program</h3>
+        <p className="text-gray-600 text-sm mb-6">
+          Are you sure you want to delete <span className="text-gray-900 font-medium">{programName}</span>? This will also remove all enrollments. This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-500 text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-red-600 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Icon for Programs
+const IconProgram = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+  </svg>
+);
+
+// Interaction type badge styling
+const getInteractionTypeBadge = (type) => {
+  const styles = {
+    Email: 'bg-blue-50 text-blue-600',
+    Phone: 'bg-green-50 text-green-600',
+    Meeting: 'bg-purple-50 text-purple-600',
+    Event: 'bg-orange-50 text-orange-600',
+    Note: 'bg-gray-50 text-gray-600',
+    Social_Media: 'bg-pink-50 text-pink-600',
+    Other: 'bg-gray-50 text-gray-600'
+  };
+  return styles[type] || styles.Other;
+};
+
+// Add Interaction Modal Component
+const AddInteractionModal = ({ isOpen, onClose, onAdd, editInteraction, contacts, organizations }) => {
+  const [formData, setFormData] = useState({
+    type: 'Note',
+    direction: 'N/A',
+    subject: '',
+    summary: '',
+    details: '',
+    contact_id: '',
+    organization_id: '',
+    email_from: '',
+    email_to: '',
+    requires_followup: false,
+    followup_date: ''
+  });
+
+  useEffect(() => {
+    if (editInteraction) {
+      setFormData({
+        type: editInteraction.type || 'Note',
+        direction: editInteraction.direction || 'N/A',
+        subject: editInteraction.subject || '',
+        summary: editInteraction.summary || '',
+        details: editInteraction.details || '',
+        contact_id: editInteraction.contact_id || '',
+        organization_id: editInteraction.organization_id || '',
+        email_from: editInteraction.email_from || '',
+        email_to: editInteraction.email_to || '',
+        requires_followup: editInteraction.requires_followup || false,
+        followup_date: editInteraction.followup_date || ''
+      });
+    } else {
+      setFormData({
+        type: 'Note',
+        direction: 'N/A',
+        subject: '',
+        summary: '',
+        details: '',
+        contact_id: '',
+        organization_id: '',
+        email_from: '',
+        email_to: '',
+        requires_followup: false,
+        followup_date: ''
+      });
+    }
+  }, [editInteraction, isOpen]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanData = {
+      ...formData,
+      contact_id: formData.contact_id || null,
+      organization_id: formData.organization_id || null,
+      followup_date: formData.followup_date || null
+    };
+    onAdd(cleanData);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const showEmailFields = formData.type === 'Email';
+  const showDirectionField = ['Email', 'Phone'].includes(formData.type);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[600px] max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <h3 className="text-gray-900 text-lg font-medium">
+            {editInteraction ? 'Edit Interaction' : 'Log New Interaction'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Type *</label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value, direction: ['Email', 'Phone'].includes(e.target.value) ? 'Outbound' : 'N/A' })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                {INTERACTION_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            {showDirectionField && (
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">Direction</label>
+                <select
+                  value={formData.direction}
+                  onChange={(e) => setFormData({ ...formData, direction: e.target.value })}
+                  className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                >
+                  {INTERACTION_DIRECTIONS.map(d => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Subject *</label>
+            <input
+              type="text"
+              required
+              value={formData.subject}
+              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              placeholder="Brief title or subject"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Contact</label>
+              <select
+                value={formData.contact_id}
+                onChange={(e) => setFormData({ ...formData, contact_id: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                <option value="">None</option>
+                {contacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-medium mb-2">Organization</label>
+              <select
+                value={formData.organization_id}
+                onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              >
+                <option value="">None</option>
+                {organizations.map(o => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {showEmailFields && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">From</label>
+                <input
+                  type="email"
+                  value={formData.email_from}
+                  onChange={(e) => setFormData({ ...formData, email_from: e.target.value })}
+                  className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  placeholder="sender@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">To</label>
+                <input
+                  type="email"
+                  value={formData.email_to}
+                  onChange={(e) => setFormData({ ...formData, email_to: e.target.value })}
+                  className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  placeholder="recipient@email.com"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Summary</label>
+            <textarea
+              value={formData.summary}
+              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={2}
+              placeholder="Quick summary of the interaction"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">Details</label>
+            <textarea
+              value={formData.details}
+              onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+              className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+              rows={3}
+              placeholder="Full details or notes"
+            />
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center gap-4 mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requires_followup}
+                  onChange={(e) => setFormData({ ...formData, requires_followup: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Requires follow-up</span>
+              </label>
+            </div>
+            {formData.requires_followup && (
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">Follow-up Date</label>
+                <input
+                  type="date"
+                  value={formData.followup_date}
+                  onChange={(e) => setFormData({ ...formData, followup_date: e.target.value })}
+                  className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-black text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-gray-800 transition-colors"
+            >
+              {editInteraction ? 'Update' : 'Log Interaction'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Delete Interaction Confirmation Modal
+const DeleteInteractionModal = ({ isOpen, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white border border-gray-200 rounded-lg w-[400px] p-5 shadow-xl">
+        <h3 className="text-gray-900 text-lg font-medium mb-4">Delete Interaction</h3>
+        <p className="text-gray-600 text-sm mb-6">
+          Are you sure you want to delete this interaction? This action cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-red-500 text-white text-sm font-medium px-4 py-2.5 rounded hover:bg-red-600 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Interactions Page (Activity Log)
+const InteractionsPage = () => {
+  const [interactions, setInteractions] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [followupFilter, setFollowupFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editInteraction, setEditInteraction] = useState(null);
+  const [deleteInteractionData, setDeleteInteractionData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const itemsPerPage = 15;
+  const toast = useToast();
+
+  // Load interactions
+  const loadInteractions = async () => {
+    try {
+      setLoading(true);
+      const [interactionsData, contactsData, orgsData] = await Promise.all([
+        fetchInteractions({
+          type: typeFilter,
+          requiresFollowup: followupFilter === 'pending' ? true : null,
+          search: searchQuery
+        }),
+        fetchContacts(),
+        fetchOrganizations()
+      ]);
+      setInteractions(interactionsData || []);
+      setContacts(contactsData || []);
+      setOrganizations(orgsData || []);
+    } catch (error) {
+      console.error('Failed to load interactions:', error);
+      toast.error('Failed to load interactions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInteractions();
+
+    const unsubscribe = subscribeToInteractions(() => {
+      loadInteractions();
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Filter interactions
+  const filteredInteractions = interactions.filter(int => {
+    const matchesSearch =
+      int.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      int.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      int.contact?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      int.organization?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesType = typeFilter === 'all' || int.type === typeFilter;
+    const matchesFollowup = followupFilter === 'all' ||
+      (followupFilter === 'pending' && int.requires_followup && !int.followup_completed);
+
+    return matchesSearch && matchesType && matchesFollowup;
+  });
+
+  // Paginate
+  const totalPages = Math.ceil(filteredInteractions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInteractions = filteredInteractions.slice(startIndex, startIndex + itemsPerPage);
+
+  // Handle add interaction
+  const handleAddInteraction = async (formData) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editInteraction) {
+        await updateInteraction(editInteraction.id, formData);
+        setEditInteraction(null);
+        toast.success('Interaction updated successfully');
+      } else {
+        await createInteraction(formData);
+        toast.success('Interaction logged successfully');
+      }
+      await loadInteractions();
+    } catch (error) {
+      console.error('Failed to save interaction:', error);
+      toast.error('Failed to save interaction. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle edit
+  const handleEditInteraction = (int) => {
+    setEditInteraction(int);
+    setIsModalOpen(true);
+  };
+
+  // Handle delete
+  const handleDeleteInteraction = async () => {
+    if (deleteInteractionData) {
+      try {
+        await deleteInteraction(deleteInteractionData.id);
+        setDeleteInteractionData(null);
+        await loadInteractions();
+        toast.success('Interaction deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete interaction:', error);
+        toast.error('Failed to delete interaction. Please try again.');
+      }
+    }
+  };
+
+  // Mark followup complete
+  const handleCompleteFollowup = async (int) => {
+    try {
+      await completeFollowup(int.id);
+      await loadInteractions();
+      toast.success('Follow-up marked as complete');
+    } catch (error) {
+      console.error('Failed to complete followup:', error);
+      toast.error('Failed to complete follow-up');
+    }
+  };
+
+  // Format date/time
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' at ' + date.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setFollowupFilter('all');
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Header />
+
+      <div className="bg-white border-b border-gray-200 px-8 py-0 h-[69px] flex items-center justify-between">
+        <h1 className="text-2xl font-medium">Activity Log</h1>
+        <button
+          onClick={() => { setEditInteraction(null); setIsModalOpen(true); }}
+          className="bg-black text-white text-sm font-medium px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+        >
+          + Log Interaction
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-white p-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-medium">All Interactions</h2>
+            <div className="flex items-center gap-4">
+              {/* Search */}
+              <div className="flex items-center gap-3 border border-gray-300 rounded px-3 py-2.5 w-[300px]">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search interactions..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="flex-1 outline-none text-sm"
+                />
+              </div>
+              {/* Type Filter */}
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All Types</option>
+                {INTERACTION_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              {/* Followup Filter */}
+              <select
+                value={followupFilter}
+                onChange={(e) => { setFollowupFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending Follow-ups</option>
+              </select>
+              {(searchQuery || typeFilter !== 'all' || followupFilter !== 'all') && (
+                <button
+                  onClick={resetFilters}
+                  className="text-sm font-medium text-gray-600 hover:text-black"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Interactions List */}
+          <div className="space-y-3">
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">Loading interactions...</div>
+            ) : paginatedInteractions.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                {interactions.length === 0 ? (
+                  <div>
+                    <p className="mb-2">No interactions logged yet.</p>
+                    <button
+                      onClick={() => { setEditInteraction(null); setIsModalOpen(true); }}
+                      className="text-black underline hover:no-underline"
+                    >
+                      Log your first interaction
+                    </button>
+                  </div>
+                ) : (
+                  'No interactions found matching your criteria.'
+                )}
+              </div>
+            ) : (
+              paginatedInteractions.map((int) => (
+                <div key={int.id} className="bg-white border border-gray-200 rounded p-4 hover:shadow-sm transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      {/* Type Icon */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getInteractionTypeBadge(int.type)}`}>
+                        {int.type === 'Email' && (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                        {int.type === 'Phone' && (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                        )}
+                        {int.type === 'Meeting' && (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        )}
+                        {int.type === 'Note' && (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        )}
+                        {!['Email', 'Phone', 'Meeting', 'Note'].includes(int.type) && (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getInteractionTypeBadge(int.type)}`}>
+                            {int.type.replace('_', ' ')}
+                          </span>
+                          {int.direction && int.direction !== 'N/A' && (
+                            <span className="text-xs text-gray-500">
+                              ({int.direction})
+                            </span>
+                          )}
+                          {int.requires_followup && !int.followup_completed && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600">
+                              Follow-up needed
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900 mb-1">{int.subject}</h3>
+                        {int.summary && (
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{int.summary}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>{formatDateTime(int.interaction_date)}</span>
+                          {int.contact && (
+                            <span className="flex items-center gap-1">
+                              <IconUsers className="w-3 h-3" />
+                              {int.contact.name}
+                            </span>
+                          )}
+                          {int.organization && (
+                            <span className="flex items-center gap-1">
+                              <IconBuilding className="w-3 h-3" />
+                              {int.organization.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 ml-4">
+                      {int.requires_followup && !int.followup_completed && (
+                        <button
+                          onClick={() => handleCompleteFollowup(int)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="Mark follow-up complete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Done
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleEditInteraction(int)}
+                        className="p-1.5 hover:bg-gray-100 rounded text-gray-600"
+                        title="Edit"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setDeleteInteractionData(int)}
+                        className="p-1.5 hover:bg-red-50 rounded text-red-500"
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+            <span className="text-gray-500 text-sm">
+              Showing {filteredInteractions.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredInteractions.length)} of {filteredInteractions.length} entries
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronLeft />
+                </button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`text-sm font-medium w-7 h-7 rounded flex items-center justify-center transition-colors ${
+                        currentPage === page
+                          ? 'bg-black text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <AddInteractionModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditInteraction(null); }}
+        onAdd={handleAddInteraction}
+        editInteraction={editInteraction}
+        contacts={contacts}
+        organizations={organizations}
+      />
+      <DeleteInteractionModal
+        isOpen={!!deleteInteractionData}
+        onClose={() => setDeleteInteractionData(null)}
+        onConfirm={handleDeleteInteraction}
+      />
+    </div>
+  );
+};
+
+// Programs Page
+const ProgramsPage = () => {
+  const [programs, setPrograms] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'start_date', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editProgram, setEditProgram] = useState(null);
+  const [deleteProgramData, setDeleteProgramData] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const itemsPerPage = 10;
+  const toast = useToast();
+
+  // Fetch programs from Supabase
+  const loadPrograms = async () => {
+    try {
+      setLoading(true);
+      const [programsData, orgsData] = await Promise.all([
+        fetchPrograms({
+          type: typeFilter,
+          status: statusFilter,
+          search: searchQuery,
+          sortBy: sortConfig.key,
+          sortDirection: sortConfig.direction
+        }),
+        fetchOrganizations()
+      ]);
+      setPrograms(programsData || []);
+      setOrganizations(orgsData || []);
+    } catch (error) {
+      console.error('Failed to load programs:', error);
+      toast.error('Failed to load programs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPrograms();
+
+    const unsubscribe = subscribeToPrograms(() => {
+      loadPrograms();
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Filter programs
+  const filteredPrograms = programs.filter(prog => {
+    const matchesSearch =
+      prog.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      prog.sport?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      prog.location?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesType = typeFilter === 'all' || prog.type === typeFilter;
+    const matchesStatus = statusFilter === 'all' || prog.status === statusFilter;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Sort programs
+  const sortedPrograms = [...filteredPrograms].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let aValue = a[sortConfig.key] || '';
+    let bValue = b[sortConfig.key] || '';
+
+    if (typeof aValue === 'string') {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginate programs
+  const totalPages = Math.ceil(sortedPrograms.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedPrograms = sortedPrograms.slice(startIndex, startIndex + itemsPerPage);
+
+  // Handle sort
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // Handle add program
+  const handleAddProgram = async (formData) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editProgram) {
+        await updateProgram(editProgram.id, formData);
+        setEditProgram(null);
+        toast.success('Program updated successfully');
+      } else {
+        await createProgram(formData);
+        toast.success('Program created successfully');
+      }
+      await loadPrograms();
+    } catch (error) {
+      console.error('Failed to save program:', error);
+      toast.error('Failed to save program. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle edit program
+  const handleEditProgram = (prog) => {
+    setEditProgram(prog);
+    setIsModalOpen(true);
+  };
+
+  // Handle delete program
+  const handleDeleteProgram = async () => {
+    if (deleteProgramData) {
+      try {
+        await deleteProgram(deleteProgramData.id);
+        setDeleteProgramData(null);
+        if (paginatedPrograms.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
+        await loadPrograms();
+        toast.success('Program deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete program:', error);
+        toast.error('Failed to delete program. Please try again.');
+      }
+    }
+  };
+
+  // Export to CSV
+  const handleExport = () => {
+    const headers = ['Name', 'Type', 'Status', 'Sport', 'Start Date', 'End Date', 'Location', 'Capacity'];
+    const csvData = sortedPrograms.map(prog =>
+      [prog.name, prog.type, prog.status, prog.sport || '', prog.start_date || '', prog.end_date || '', prog.location || '', prog.capacity || ''].join(',')
+    );
+    const csv = [headers.join(','), ...csvData].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'programs.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setStatusFilter('all');
+    setCurrentPage(1);
+  };
+
+  // Format date
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <Header />
+
+      <div className="bg-white border-b border-gray-200 px-8 py-0 h-[69px] flex items-center justify-between">
+        <h1 className="text-2xl font-medium">Programs</h1>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+          >
+            <IconExport />
+            Export
+          </button>
+          <button
+            onClick={() => { setEditProgram(null); setIsModalOpen(true); }}
+            className="bg-black text-white text-sm font-medium px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+          >
+            + Add Program
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-white p-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-medium">All Programs</h2>
+            <div className="flex items-center gap-4">
+              {/* Search */}
+              <div className="flex items-center gap-3 border border-gray-300 rounded px-3 py-2.5 w-[300px]">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search programs..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="flex-1 outline-none text-sm"
+                />
+              </div>
+              {/* Type Filter */}
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All Types</option>
+                {PROGRAM_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                className="border border-black rounded px-3 py-2 text-sm font-medium"
+              >
+                <option value="all">All Status</option>
+                {PROGRAM_STATUSES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              {(searchQuery || typeFilter !== 'all' || statusFilter !== 'all') && (
+                <button
+                  onClick={resetFilters}
+                  className="text-sm font-medium text-gray-600 hover:text-black"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="space-y-3">
+            {/* Header Row */}
+            <div className="bg-gray-50 border border-gray-200 rounded flex items-center">
+              <div className="w-[220px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
+                <span className="text-sm text-gray-400 uppercase">Name</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[100px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('type')}>
+                <span className="text-sm text-gray-400 uppercase">Type</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[100px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
+                <span className="text-sm text-gray-400 uppercase">Status</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[180px] px-3 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('start_date')}>
+                <span className="text-sm text-gray-400 uppercase">Dates</span>
+                <IconSortUpDown />
+              </div>
+              <div className="w-[150px] px-3 py-3 flex items-center gap-2">
+                <span className="text-sm text-gray-400 uppercase">Location</span>
+              </div>
+              <div className="w-[80px] px-3 py-3 flex items-center gap-2">
+                <span className="text-sm text-gray-400 uppercase">Capacity</span>
+              </div>
+              <div className="flex-1 px-3 py-3">
+                <span className="text-sm text-gray-400 uppercase">Actions</span>
+              </div>
+            </div>
+
+            {/* Data Rows */}
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">Loading programs...</div>
+            ) : paginatedPrograms.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                {programs.length === 0 ? (
+                  <div>
+                    <p className="mb-2">No programs yet.</p>
+                    <button
+                      onClick={() => { setEditProgram(null); setIsModalOpen(true); }}
+                      className="text-black underline hover:no-underline"
+                    >
+                      Add your first program
+                    </button>
+                  </div>
+                ) : (
+                  'No programs found matching your criteria.'
+                )}
+              </div>
+            ) : (
+              paginatedPrograms.map((prog) => (
+                <div key={prog.id} className="bg-white border border-gray-200 rounded flex items-center hover:shadow-sm transition-shadow">
+                  {/* Name */}
+                  <div className="w-[220px] px-3 py-2.5 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-blue-50 flex items-center justify-center">
+                      <IconProgram className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium truncate">{prog.name}</span>
+                      {prog.sport && (
+                        <span className="text-xs text-gray-500 truncate">{prog.sport}</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Type */}
+                  <div className="w-[100px] px-3 py-2.5">
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getProgramTypeBadge(prog.type)}`}>
+                      {prog.type}
+                    </span>
+                  </div>
+                  {/* Status */}
+                  <div className="w-[100px] px-3 py-2.5">
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium capitalize ${getProgramStatusBadge(prog.status)}`}>
+                      {prog.status?.replace('_', ' ')}
+                    </span>
+                  </div>
+                  {/* Dates */}
+                  <div className="w-[180px] px-3 py-2.5">
+                    {prog.start_date || prog.end_date ? (
+                      <div className="flex items-center gap-1">
+                        <IconCalendar />
+                        <span className="text-xs text-gray-600">
+                          {formatDate(prog.start_date)} {prog.end_date && `- ${formatDate(prog.end_date)}`}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No dates set</span>
+                    )}
+                  </div>
+                  {/* Location */}
+                  <div className="w-[150px] px-3 py-2.5">
+                    {prog.location ? (
+                      <div className="flex items-center gap-2">
+                        <IconMapPin />
+                        <span className="text-sm text-gray-600 truncate">{prog.location}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">No location</span>
+                    )}
+                  </div>
+                  {/* Capacity */}
+                  <div className="w-[80px] px-3 py-2.5">
+                    {prog.capacity ? (
+                      <span className="text-sm text-gray-600">{prog.capacity}</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
+                  </div>
+                  {/* Actions */}
+                  <div className="flex-1 px-3 py-2.5 flex items-center gap-2">
+                    <button
+                      onClick={() => handleEditProgram(prog)}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-600"
+                      title="Edit"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setDeleteProgramData(prog)}
+                      className="p-1.5 hover:bg-red-50 rounded text-red-500"
+                      title="Delete"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Table Footer */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+            <span className="text-gray-500 text-sm">
+              Showing {sortedPrograms.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedPrograms.length)} of {sortedPrograms.length} entries
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronLeft />
+                </button>
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`text-sm font-medium w-7 h-7 rounded flex items-center justify-center transition-colors ${
+                        currentPage === page
+                          ? 'bg-black text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`text-gray-600 hover:text-black transition-colors ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <IconChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <AddProgramModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditProgram(null); }}
+        onAdd={handleAddProgram}
+        editProgram={editProgram}
+        organizations={organizations}
+      />
+      <DeleteProgramModal
+        isOpen={!!deleteProgramData}
+        onClose={() => setDeleteProgramData(null)}
+        onConfirm={handleDeleteProgram}
+        programName={deleteProgramData?.name}
+      />
+    </div>
+  );
+};
 
 // Add Employee Modal Component
 const AddEmployeeModal = ({ isOpen, onClose, onAdd, editEmployee }) => {
@@ -1780,7 +4009,28 @@ function App() {
             <Route path="/companies" element={
               <ProtectedRoute>
                 <AuthenticatedLayout>
-                  <ComingSoonPage title="Companies" />
+                  <OrganizationsPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/organizations" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <OrganizationsPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/programs" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ProgramsPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/activity" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <InteractionsPage />
                 </AuthenticatedLayout>
               </ProtectedRoute>
             } />
