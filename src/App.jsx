@@ -1715,92 +1715,92 @@ function App() {
     <Router>
       <AuthProvider>
         <ToastProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
 
-          {/* Protected routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <DashboardPage />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/notes" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <NotesPage />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/notifications" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Notifications" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/tasks" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Tasks" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/emails" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Emails" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/calendars" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Calendars" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/analytics" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Analytics" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/contacts" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ContactsPage />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/companies" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Companies" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <ComingSoonPage title="Settings" />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
+            {/* Protected routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <DashboardPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/notes" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <NotesPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Notifications" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/tasks" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Tasks" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/emails" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Emails" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/calendars" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Calendars" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Analytics" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/contacts" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ContactsPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/companies" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Companies" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <ComingSoonPage title="Settings" />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
 
-          {/* Fallback */}
-          <Route path="*" element={
-            <ProtectedRoute>
-              <AuthenticatedLayout>
-                <DashboardPage />
-              </AuthenticatedLayout>
-            </ProtectedRoute>
-          } />
-        </Routes>
+            {/* Fallback */}
+            <Route path="*" element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <DashboardPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            } />
+          </Routes>
         </ToastProvider>
       </AuthProvider>
     </Router>
