@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchContacts, createContact, updateContact, deleteContact, toggleContactStatus, subscribeToContacts } from './lib/contacts';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoginPage from './components/Auth/LoginPage';
+import SignupPage from './components/Auth/SignupPage';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 // Image assets from Figma
 const imgFrame5518 = "https://www.figma.com/api/mcp/asset/5034dbbb-1e7a-45f1-933a-971fa4c14a55";
@@ -613,6 +617,17 @@ const Sidebar = () => {
 // Header Component
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  // Get display name from user metadata or email
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
   return (
     <div className="h-[72px] bg-white border-b border-gray-200 px-8 flex items-center justify-between">
@@ -636,10 +651,40 @@ const Header = () => {
           <span className="text-sm font-medium text-gray-600">Help Center</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <img src={imgFrame5518} alt="User" className="w-8 h-8 rounded-full" />
-          <span className="text-sm font-medium">Brian F.</span>
-          <IconChevronDown />
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-3 px-2 py-2 rounded hover:bg-gray-100 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-sm font-medium">{displayName}</span>
+            <IconChevronDown />
+          </button>
+
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-48">
+              <div className="p-3 border-b border-gray-200">
+                <p className="text-sm font-medium truncate">{displayName}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+              <div className="p-1">
+                <button
+                  onClick={() => { navigate('/settings'); setShowUserMenu(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                >
+                  Settings
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1642,26 +1687,108 @@ const ContactsPage = () => {
   );
 };
 
+// Layout wrapper for authenticated pages
+const AuthenticatedLayout = ({ children }) => {
+  return (
+    <div className="flex h-screen overflow-hidden bg-white">
+      <Sidebar />
+      {children}
+    </div>
+  );
+};
+
 // Main App Component
 function App() {
   return (
     <Router>
-      <div className="flex h-screen overflow-hidden bg-white">
-        <Sidebar />
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/notes" element={<NotesPage />} />
-          <Route path="/notifications" element={<ComingSoonPage title="Notifications" />} />
-          <Route path="/tasks" element={<ComingSoonPage title="Tasks" />} />
-          <Route path="/emails" element={<ComingSoonPage title="Emails" />} />
-          <Route path="/calendars" element={<ComingSoonPage title="Calendars" />} />
-          <Route path="/analytics" element={<ComingSoonPage title="Analytics" />} />
-          <Route path="/contacts" element={<ContactsPage />} />
-          <Route path="/companies" element={<ComingSoonPage title="Companies" />} />
-          <Route path="/settings" element={<ComingSoonPage title="Settings" />} />
-          <Route path="*" element={<DashboardPage />} />
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+
+          {/* Protected routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <DashboardPage />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notes" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <NotesPage />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Notifications" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Tasks" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/emails" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Emails" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/calendars" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Calendars" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Analytics" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/contacts" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ContactsPage />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/companies" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Companies" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <ComingSoonPage title="Settings" />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
+
+          {/* Fallback */}
+          <Route path="*" element={
+            <ProtectedRoute>
+              <AuthenticatedLayout>
+                <DashboardPage />
+              </AuthenticatedLayout>
+            </ProtectedRoute>
+          } />
         </Routes>
-      </div>
+      </AuthProvider>
     </Router>
   );
 }
