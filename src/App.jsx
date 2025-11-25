@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { fetchContacts, createContact, updateContact, deleteContact, toggleContactStatus, subscribeToContacts } from './lib/contacts';
 
 // Image assets from Figma
 const imgFrame5518 = "https://www.figma.com/api/mcp/asset/5034dbbb-1e7a-45f1-933a-971fa4c14a55";
@@ -179,17 +180,11 @@ const IconSortUpDown = () => (
   </svg>
 );
 
-// People data for dashboard
-const initialPeopleData = [
-  { id: 1, name: 'Robert Fox', email: 'robertfox@example.com', phone: '(671) 555-0110', category: 'Employee', location: 'Austin', gender: 'Male', avatar: contactAvatar1 },
-  { id: 2, name: 'Cody Fisher', email: 'codyfisher@example.com', phone: '(505) 555-0125', category: 'Customers', location: 'Orange', gender: 'Male', avatar: contactAvatar2 },
-  { id: 3, name: 'Albert Flores', email: 'albertflores@example.com', phone: '(704) 555-0127', category: 'Customers', location: 'Pembroke Pines', gender: 'Female', avatar: contactAvatar3 },
-  { id: 4, name: 'Floyd Miles', email: 'floydmiles@example.com', phone: '(405) 555-0128', category: 'Employee', location: 'Fairfield', gender: 'Male', avatar: contactAvatar1 },
-  { id: 5, name: 'Arlene McCoy', email: 'arlenemccoy@example.com', phone: '(219) 555-0114', category: 'Partners', location: 'Toledo', gender: 'Female', avatar: contactAvatar2 },
-  { id: 6, name: 'Sarah Johnson', email: 'sarahjohnson@example.com', phone: '(312) 555-0199', category: 'Employee', location: 'Chicago', gender: 'Female', avatar: contactAvatar3 },
-  { id: 7, name: 'Michael Chen', email: 'michaelchen@example.com', phone: '(415) 555-0177', category: 'Customers', location: 'San Francisco', gender: 'Male', avatar: contactAvatar1 },
-  { id: 8, name: 'Emily Davis', email: 'emilydavis@example.com', phone: '(206) 555-0133', category: 'Partners', location: 'Seattle', gender: 'Female', avatar: contactAvatar2 },
-];
+// Default avatar mapping
+const getDefaultAvatar = (index) => {
+  const avatars = [contactAvatar1, contactAvatar2, contactAvatar3];
+  return avatars[index % avatars.length];
+};
 
 // Get category badge styling
 const getCategoryBadge = (category) => {
@@ -203,12 +198,48 @@ const getCategoryBadge = (category) => {
 
 // People Table Component (used in Dashboard)
 const PeopleTable = () => {
-  const [people, setPeople] = useState(initialPeopleData);
+  const [people, setPeople] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [selectedPeople, setSelectedPeople] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  // Fetch people from Supabase
+  useEffect(() => {
+    const loadPeople = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchContacts({ limit: 8 });
+        // Map Supabase data to component format
+        const mappedData = data.map((contact, index) => ({
+          id: contact.id,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          category: contact.category || 'Employee',
+          location: contact.location,
+          gender: contact.gender,
+          avatar: contact.avatar_url || getDefaultAvatar(index)
+        }));
+        setPeople(mappedData);
+      } catch (error) {
+        console.error('Failed to load people:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPeople();
+
+    // Subscribe to realtime updates
+    const unsubscribe = subscribeToContacts(() => {
+      loadPeople();
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Filter people
   const filteredPeople = people.filter(person => {
@@ -354,7 +385,9 @@ const PeopleTable = () => {
         </div>
 
         {/* Data Rows */}
-        {sortedPeople.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8 text-gray-500">Loading contacts...</div>
+        ) : sortedPeople.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No people found matching your criteria.</div>
         ) : (
           sortedPeople.map((person) => (
@@ -919,21 +952,6 @@ const NotesPage = () => {
   );
 };
 
-// Initial employee data
-const initialEmployees = [
-  { id: '1001', name: 'Ricky Antony', role: 'Web Designer', email: 'ricky.antony@gmail.com', phone: '+91 123 456 7890', gender: 'Male', location: 'Delhi', status: 'active', avatar: contactAvatar1 },
-  { id: '1002', name: 'Sarah Johnson', role: 'Product Manager', email: 'sarah.johnson@gmail.com', phone: '+91 234 567 8901', gender: 'Female', location: 'Mumbai', status: 'active', avatar: contactAvatar2 },
-  { id: '1003', name: 'Michael Chen', role: 'Software Engineer', email: 'michael.chen@gmail.com', phone: '+91 345 678 9012', gender: 'Male', location: 'Bangalore', status: 'pending', avatar: contactAvatar3 },
-  { id: '1004', name: 'Emily Davis', role: 'UX Designer', email: 'emily.davis@gmail.com', phone: '+91 456 789 0123', gender: 'Female', location: 'Chennai', status: 'active', avatar: contactAvatar1 },
-  { id: '1005', name: 'James Wilson', role: 'Data Analyst', email: 'james.wilson@gmail.com', phone: '+91 567 890 1234', gender: 'Male', location: 'Hyderabad', status: 'pending', avatar: contactAvatar2 },
-  { id: '1006', name: 'Priya Sharma', role: 'HR Manager', email: 'priya.sharma@gmail.com', phone: '+91 678 901 2345', gender: 'Female', location: 'Delhi', status: 'active', avatar: contactAvatar3 },
-  { id: '1007', name: 'David Brown', role: 'DevOps Engineer', email: 'david.brown@gmail.com', phone: '+91 789 012 3456', gender: 'Male', location: 'Pune', status: 'active', avatar: contactAvatar1 },
-  { id: '1008', name: 'Anjali Patel', role: 'Marketing Lead', email: 'anjali.patel@gmail.com', phone: '+91 890 123 4567', gender: 'Female', location: 'Mumbai', status: 'pending', avatar: contactAvatar2 },
-  { id: '1009', name: 'Robert Taylor', role: 'Backend Developer', email: 'robert.taylor@gmail.com', phone: '+91 901 234 5678', gender: 'Male', location: 'Bangalore', status: 'active', avatar: contactAvatar3 },
-  { id: '1010', name: 'Neha Gupta', role: 'QA Engineer', email: 'neha.gupta@gmail.com', phone: '+91 012 345 6789', gender: 'Female', location: 'Kolkata', status: 'active', avatar: contactAvatar1 },
-  { id: '1011', name: 'Chris Anderson', role: 'Frontend Developer', email: 'chris.anderson@gmail.com', phone: '+91 111 222 3333', gender: 'Male', location: 'Chennai', status: 'pending', avatar: contactAvatar2 },
-  { id: '1012', name: 'Kavita Singh', role: 'Project Manager', email: 'kavita.singh@gmail.com', phone: '+91 222 333 4444', gender: 'Female', location: 'Delhi', status: 'active', avatar: contactAvatar3 },
-];
 
 // Add Employee Modal Component
 const AddEmployeeModal = ({ isOpen, onClose, onAdd, editEmployee }) => {
@@ -1126,16 +1144,60 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, employeeName }) => {
 
 // Contacts Page (Employees Table)
 const ContactsPage = () => {
-  const [employees, setEmployees] = useState(initialEmployees);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'employee_id', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null);
-  const [deleteEmployee, setDeleteEmployee] = useState(null);
+  const [deleteEmployeeData, setDeleteEmployeeData] = useState(null);
   const itemsPerPage = 5;
+
+  // Fetch employees from Supabase
+  const loadEmployees = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchContacts({
+        status: statusFilter,
+        gender: genderFilter,
+        search: searchQuery,
+        sortBy: sortConfig.key === 'id' ? 'employee_id' : sortConfig.key,
+        sortDirection: sortConfig.direction
+      });
+      // Map Supabase data to component format
+      const mappedData = data.map((contact, index) => ({
+        id: contact.id,
+        employee_id: contact.employee_id,
+        name: contact.name,
+        role: contact.role || '',
+        email: contact.email,
+        phone: contact.phone,
+        gender: contact.gender,
+        location: contact.location,
+        status: contact.status,
+        avatar: contact.avatar_url || getDefaultAvatar(index)
+      }));
+      setEmployees(mappedData);
+    } catch (error) {
+      console.error('Failed to load employees:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees();
+
+    // Subscribe to realtime updates
+    const unsubscribe = subscribeToContacts(() => {
+      loadEmployees();
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const columns = [
     { key: 'id', label: 'Employee ID', sortable: true },
@@ -1147,12 +1209,12 @@ const ContactsPage = () => {
     { key: 'status', label: 'Status', sortable: true },
   ];
 
-  // Filter employees
+  // Filter employees (client-side for immediate feedback)
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch =
       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.location.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -1166,8 +1228,9 @@ const ContactsPage = () => {
   const sortedEmployees = [...filteredEmployees].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
-    let aValue = a[sortConfig.key];
-    let bValue = b[sortConfig.key];
+    const key = sortConfig.key === 'id' ? 'employee_id' : sortConfig.key;
+    let aValue = a[key];
+    let bValue = b[key];
 
     if (typeof aValue === 'string') {
       aValue = aValue.toLowerCase();
@@ -1196,23 +1259,40 @@ const ContactsPage = () => {
   };
 
   // Handle add employee
-  const handleAddEmployee = (formData) => {
-    if (editEmployee) {
-      setEmployees(prev => prev.map(emp =>
-        emp.id === editEmployee.id
-          ? { ...emp, ...formData }
-          : emp
-      ));
-      setEditEmployee(null);
-    } else {
-      const newId = String(Math.max(...employees.map(e => parseInt(e.id))) + 1);
-      const avatars = [contactAvatar1, contactAvatar2, contactAvatar3];
-      const newEmployee = {
-        ...formData,
-        id: newId,
-        avatar: avatars[Math.floor(Math.random() * avatars.length)]
-      };
-      setEmployees(prev => [...prev, newEmployee]);
+  const handleAddEmployee = async (formData) => {
+    try {
+      if (editEmployee) {
+        // Update existing employee
+        await updateContact(editEmployee.id, {
+          name: formData.name,
+          role: formData.role,
+          email: formData.email,
+          phone: formData.phone,
+          gender: formData.gender,
+          location: formData.location,
+          status: formData.status
+        });
+        setEditEmployee(null);
+      } else {
+        // Create new employee
+        const avatars = [contactAvatar1, contactAvatar2, contactAvatar3];
+        await createContact({
+          name: formData.name,
+          role: formData.role,
+          email: formData.email,
+          phone: formData.phone,
+          gender: formData.gender,
+          location: formData.location,
+          status: formData.status,
+          category: 'Employee',
+          avatar_url: avatars[Math.floor(Math.random() * avatars.length)]
+        });
+      }
+      // Reload data after changes
+      await loadEmployees();
+    } catch (error) {
+      console.error('Failed to save employee:', error);
+      alert('Failed to save employee. Please try again.');
     }
   };
 
@@ -1223,31 +1303,38 @@ const ContactsPage = () => {
   };
 
   // Handle delete employee
-  const handleDeleteEmployee = () => {
-    if (deleteEmployee) {
-      setEmployees(prev => prev.filter(emp => emp.id !== deleteEmployee.id));
-      setDeleteEmployee(null);
-      // Reset to page 1 if current page becomes empty
-      if (paginatedEmployees.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
+  const handleDeleteEmployee = async () => {
+    if (deleteEmployeeData) {
+      try {
+        await deleteContact(deleteEmployeeData.id);
+        setDeleteEmployeeData(null);
+        // Reset to page 1 if current page becomes empty
+        if (paginatedEmployees.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
+        await loadEmployees();
+      } catch (error) {
+        console.error('Failed to delete employee:', error);
+        alert('Failed to delete employee. Please try again.');
       }
     }
   };
 
   // Handle status toggle
-  const handleStatusToggle = (employeeId) => {
-    setEmployees(prev => prev.map(emp =>
-      emp.id === employeeId
-        ? { ...emp, status: emp.status === 'active' ? 'pending' : 'active' }
-        : emp
-    ));
+  const handleStatusToggle = async (employeeId, currentStatus) => {
+    try {
+      await toggleContactStatus(employeeId, currentStatus);
+      await loadEmployees();
+    } catch (error) {
+      console.error('Failed to toggle status:', error);
+    }
   };
 
   // Export to CSV
   const handleExport = () => {
     const headers = ['Employee ID', 'Name', 'Role', 'Email', 'Phone', 'Gender', 'Location', 'Status'];
     const csvData = sortedEmployees.map(emp =>
-      [emp.id, emp.name, emp.role, emp.email, emp.phone, emp.gender, emp.location, emp.status].join(',')
+      [emp.employee_id, emp.name, emp.role, emp.email, emp.phone, emp.gender, emp.location, emp.status].join(',')
     );
     const csv = [headers.join(','), ...csvData].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -1400,14 +1487,16 @@ const ContactsPage = () => {
             </div>
 
             {/* Data Rows */}
-            {paginatedEmployees.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-12 text-gray-500">Loading contacts...</div>
+            ) : paginatedEmployees.length === 0 ? (
               <div className="text-center py-12 text-gray-500">No contacts found matching your criteria.</div>
             ) : (
               paginatedEmployees.map((employee) => (
                 <div key={employee.id} className="bg-white border border-gray-200 rounded flex items-center hover:shadow-sm transition-shadow">
                   {/* ID */}
                   <div className="w-[80px] px-3 py-2.5 text-sm text-gray-600">
-                    {employee.id}
+                    {employee.employee_id}
                   </div>
                   {/* Name */}
                   <div className="w-[200px] px-3 py-2.5 flex items-center gap-3">
@@ -1439,7 +1528,7 @@ const ContactsPage = () => {
                   </div>
                   {/* Status */}
                   <div className="w-[100px] px-3 py-2.5">
-                    <button onClick={() => handleStatusToggle(employee.id)} className="focus:outline-none">
+                    <button onClick={() => handleStatusToggle(employee.id, employee.status)} className="focus:outline-none">
                       {employee.status === 'active' ? (
                         <span className="bg-green-50 text-green-600 text-xs font-medium px-2 py-1 rounded">Active</span>
                       ) : (
@@ -1477,7 +1566,7 @@ const ContactsPage = () => {
                       </svg>
                     </button>
                     <button
-                      onClick={() => setDeleteEmployee(employee)}
+                      onClick={() => setDeleteEmployeeData(employee)}
                       className="p-1.5 hover:bg-red-50 rounded text-red-500"
                       title="Delete"
                     >
@@ -1544,10 +1633,10 @@ const ContactsPage = () => {
         editEmployee={editEmployee}
       />
       <DeleteConfirmModal
-        isOpen={!!deleteEmployee}
-        onClose={() => setDeleteEmployee(null)}
+        isOpen={!!deleteEmployeeData}
+        onClose={() => setDeleteEmployeeData(null)}
         onConfirm={handleDeleteEmployee}
-        employeeName={deleteEmployee?.name}
+        employeeName={deleteEmployeeData?.name}
       />
     </div>
   );
