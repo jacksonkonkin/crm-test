@@ -1,30 +1,30 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { signupSchema, validate, checkPasswordStrength } from '../../lib/validation'
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const { signUp } = useAuth()
   const navigate = useNavigate()
 
+  const passwordStrength = checkPasswordStrength(password)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    setErrors({})
 
-    // Validation
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
+    // Validate with Zod
+    const result = validate(signupSchema, { fullName, email, password, confirmPassword })
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (!result.success) {
+      setErrors(result.errors)
       return
     }
 
@@ -34,10 +34,22 @@ export default function SignupPage() {
       await signUp(email, password, { full_name: fullName })
       setSuccess(true)
     } catch (err) {
-      setError(err.message || 'Failed to create account')
+      setErrors({ form: err.message || 'Failed to create account' })
     } finally {
       setLoading(false)
     }
+  }
+
+  const getStrengthColor = (score) => {
+    if (score <= 2) return 'bg-red-500'
+    if (score <= 4) return 'bg-yellow-500'
+    return 'bg-green-500'
+  }
+
+  const getStrengthText = (score) => {
+    if (score <= 2) return 'Weak'
+    if (score <= 4) return 'Medium'
+    return 'Strong'
   }
 
   if (success) {
@@ -79,9 +91,9 @@ export default function SignupPage() {
 
           <h2 className="text-xl font-medium text-center mb-6">Create your account</h2>
 
-          {error && (
+          {errors.form && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4 text-sm">
-              {error}
+              {errors.form}
             </div>
           )}
 
@@ -95,9 +107,12 @@ export default function SignupPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                className={`w-full bg-white border rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-1 ${
+                  errors.fullName ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-black focus:ring-black'
+                }`}
                 placeholder="John Doe"
               />
+              {errors.fullName && <p className="mt-1 text-xs text-red-500">{errors.fullName}</p>}
             </div>
 
             <div>
@@ -109,9 +124,12 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                className={`w-full bg-white border rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-1 ${
+                  errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-black focus:ring-black'
+                }`}
                 placeholder="you@example.com"
               />
+              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
             </div>
 
             <div>
@@ -123,9 +141,39 @@ export default function SignupPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
-                placeholder="At least 6 characters"
+                className={`w-full bg-white border rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-1 ${
+                  errors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-black focus:ring-black'
+                }`}
+                placeholder="Min 8 chars, uppercase, lowercase, number"
               />
+              {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password}</p>}
+
+              {/* Password strength indicator */}
+              {password && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-200 rounded overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${getStrengthColor(passwordStrength.score)}`}
+                        style={{ width: `${(passwordStrength.score / 6) * 100}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-medium ${
+                      passwordStrength.score <= 2 ? 'text-red-500' :
+                      passwordStrength.score <= 4 ? 'text-yellow-600' : 'text-green-600'
+                    }`}>
+                      {getStrengthText(passwordStrength.score)}
+                    </span>
+                  </div>
+                  {passwordStrength.feedback.length > 0 && (
+                    <ul className="mt-1 text-xs text-gray-500">
+                      {passwordStrength.feedback.slice(0, 2).map((tip, i) => (
+                        <li key={i}>{tip}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -137,9 +185,12 @@ export default function SignupPage() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                className={`w-full bg-white border rounded px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:ring-1 ${
+                  errors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-black focus:ring-black'
+                }`}
                 placeholder="Confirm your password"
               />
+              {errors.confirmPassword && <p className="mt-1 text-xs text-red-500">{errors.confirmPassword}</p>}
             </div>
 
             <button

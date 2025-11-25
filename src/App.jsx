@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { fetchContacts, createContact, updateContact, deleteContact, toggleContactStatus, subscribeToContacts } from './lib/contacts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider, useToast } from './components/Toast/Toast';
 import LoginPage from './components/Auth/LoginPage';
 import SignupPage from './components/Auth/SignupPage';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -1199,7 +1200,9 @@ const ContactsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null);
   const [deleteEmployeeData, setDeleteEmployeeData] = useState(null);
+  const [saving, setSaving] = useState(false);
   const itemsPerPage = 5;
+  const toast = useToast();
 
   // Fetch employees from Supabase
   const loadEmployees = async () => {
@@ -1305,6 +1308,8 @@ const ContactsPage = () => {
 
   // Handle add employee
   const handleAddEmployee = async (formData) => {
+    if (saving) return; // Prevent double submission
+    setSaving(true);
     try {
       if (editEmployee) {
         // Update existing employee
@@ -1318,6 +1323,7 @@ const ContactsPage = () => {
           status: formData.status
         });
         setEditEmployee(null);
+        toast.success('Contact updated successfully');
       } else {
         // Create new employee
         const avatars = [contactAvatar1, contactAvatar2, contactAvatar3];
@@ -1332,12 +1338,15 @@ const ContactsPage = () => {
           category: 'Employee',
           avatar_url: avatars[Math.floor(Math.random() * avatars.length)]
         });
+        toast.success('Contact created successfully');
       }
       // Reload data after changes
       await loadEmployees();
     } catch (error) {
       console.error('Failed to save employee:', error);
-      alert('Failed to save employee. Please try again.');
+      toast.error('Failed to save contact. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1358,9 +1367,10 @@ const ContactsPage = () => {
           setCurrentPage(currentPage - 1);
         }
         await loadEmployees();
+        toast.success('Contact deleted successfully');
       } catch (error) {
         console.error('Failed to delete employee:', error);
-        alert('Failed to delete employee. Please try again.');
+        toast.error('Failed to delete contact. Please try again.');
       }
     }
   };
@@ -1370,8 +1380,10 @@ const ContactsPage = () => {
     try {
       await toggleContactStatus(employeeId, currentStatus);
       await loadEmployees();
+      toast.success(`Status changed to ${currentStatus === 'active' ? 'pending' : 'active'}`);
     } catch (error) {
       console.error('Failed to toggle status:', error);
+      toast.error('Failed to update status');
     }
   };
 
@@ -1702,6 +1714,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <ToastProvider>
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -1788,6 +1801,7 @@ function App() {
             </ProtectedRoute>
           } />
         </Routes>
+        </ToastProvider>
       </AuthProvider>
     </Router>
   );
